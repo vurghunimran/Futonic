@@ -5,10 +5,20 @@
 .agenda-item:hover { background: var(--brand-soft); }
 .agenda-item strong, .agenda-item span { display: block; }
 .agenda-time { color: var(--brand); font-size: 10px; font-weight: 850; margin-bottom: 5px; }
+.agenda-player { display: flex !important; align-items: center; gap: 4px; color: var(--brand); background: var(--brand-soft); border-radius: 6px; padding: 4px 5px; margin-bottom: 6px; font-size: 9px; font-weight: 800; }
 .agenda-item strong { font-size: 11px; line-height: 1.3; }
 .agenda-item > span { font-size: 9px; color: #667085; margin: 4px 0 8px; }
 .agenda-item .badge { display: inline-block; }
 .agenda-empty { width: 100%; border: 1px dashed #d9dce2; background: transparent; color: #a0a7b2; border-radius: 9px; padding: 8px 5px; display: flex; justify-content: center; align-items: center; gap: 4px; font-size: 9px; opacity: 0; transition: .15s; }
 .day:hover .agenda-empty { opacity: 1; }
 .agenda-empty-banner { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; color: #89919c; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font-size: 11px; box-shadow: 0 4px 15px rgba(16,24,40,.06); white-space: nowrap; }
+.provider-badge { border-radius: 999px; padding: 7px 10px; background: #f0f1f3; color: #667085; font-size: 10px; font-weight: 750; }
+.provider-badge.live { background: #e8f7e9; color: #237a32; }
+.results-error { color: #b42318; background: #fff3f2; padding: 11px 12px; border-radius: 8px; font-size: 11px; }
+.crest.has-image { background-position: center; background-size: contain; background-repeat: no-repeat; background-color: #fff; }
+.fixture-details { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 18px; }
+.fixture-details > div { background: #f7f7f9; border-radius: 10px; padding: 11px; }
+.fixture-details span, .fixture-details strong { display: block; }
+.fixture-details span { color: #7a8491; text-transform: uppercase; letter-spacing: .06em; font-size: 9px; margin-bottom: 4px; }
+.fixture-details strong { font-size: 11px; }
 @media(max-width:680px) { .agenda-actions { flex-wrap: wrap; } .agenda-empty-banner { white-space: normal; width: 80%; } }

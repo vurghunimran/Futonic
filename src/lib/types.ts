@@ -15,6 +15,11 @@ export type AgendaItem = {
   venue?: string;
   round?: string;
   selectedPlayer?: string;
+  externalFixtureId?: string;
+  homeLogo?: string;
+  awayLogo?: string;
+  competitionLogo?: string;
+  fixtureStatus?: string;
   status: WorkStatus;
   priority: Priority;
   worker?: string;
@@ -29,4 +34,8 @@ export type FootballEntity = {
   subtitle: string;
   crest: string;
   club?: string;
+  externalId?: string;
+  teamId?: string;
+  provider?: string;
+  image?: string;
 };

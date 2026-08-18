@@ -7,13 +7,12 @@ import {
   Bell, BriefcaseBusiness, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleUserRound,
   Copy, LayoutDashboard, LogOut, Plus, Search, Settings, Trash2, UserRoundPlus, Users, X,
 } from "lucide-react";
-import { footballEntities } from "@/lib/demo-data";
-import type { FootballEntity } from "@/lib/types";
+import type { AgendaItem, FootballEntity } from "@/lib/types";
 import { getWeekDays, moveWeek, weekLabel } from "@/lib/time";
 
 type Page = "dashboard" | "clients" | "workers" | "settings";
 type Worker = { id: string; name: string; surname: string; role: string };
-type WorkItem = { id: string; title: string; client: string; workerId: string; startsAt: string; status: "Unassigned" | "Assigned" | "In Progress" | "Completed" };
+type WorkItem = AgendaItem & { client: string; workerId: string };
 
 const navigation = [
   { page: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
@@ -37,9 +36,10 @@ export function Dashboard() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const [storageReady, setStorageReady] = useState(false);
-  const results = query.length >= 2
-    ? footballEntities.filter((entity) => entity.type === mode && entity.name.toLowerCase().includes(query.toLowerCase()))
-    : [];
+  const [results, setResults] = useState<FootballEntity[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [footballProvider, setFootballProvider] = useState("demo");
 
   useEffect(() => {
     try {
@@ -63,6 +63,24 @@ export function Dashboard() {
     const timeout = setTimeout(() => setToast(""), 2600);
     return () => clearTimeout(timeout);
   }, [toast]);
+  useEffect(() => {
+    if (query.trim().length < 3) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setSearching(true);
+      setSearchError("");
+      try {
+        const response = await fetch(`/api/football/search?q=${encodeURIComponent(query.trim())}&type=${mode}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Search failed");
+        setResults(data.results || []);
+        setFootballProvider(data.provider || "demo");
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") { setResults([]); setSearchError((error as Error).message); }
+      } finally { setSearching(false); }
+    }, 350);
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }, [query, mode]);
 
   function selectPage(next: Page) {
     setPage(next);
@@ -70,11 +88,23 @@ export function Dashboard() {
     setNoticeOpen(false);
   }
 
-  function addClient(entity: FootballEntity) {
+  async function addClient(entity: FootballEntity) {
     if (clients.some((client) => client.id === entity.id)) return setToast(`${entity.name} is already in My Clients`);
     setClients((current) => [...current, entity]);
     setQuery("");
-    setToast(`${entity.name} added to My Clients`);
+    setSearching(true);
+    try {
+      const params = new URLSearchParams({ teamId: entity.teamId || entity.id });
+      if (entity.type === "player") params.set("playerName", entity.name);
+      const response = await fetch(`/api/football/fixtures?${params}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Fixtures could not be loaded");
+      const incoming: WorkItem[] = (data.fixtures || []).map((fixture: AgendaItem) => ({ ...fixture, client: entity.name, workerId: "" }));
+      setWork((current) => [...current, ...incoming.filter((fixture) => !current.some((saved) => saved.id === fixture.id))]);
+      setToast(`${entity.name} added with ${incoming.length} upcoming match${incoming.length === 1 ? "" : "es"}`);
+      setPage("dashboard");
+    } catch (error) { setToast(`${entity.name} saved, but ${(error as Error).message.toLowerCase()}`); }
+    finally { setSearching(false); }
   }
 
   async function signOut() {
@@ -100,7 +130,7 @@ export function Dashboard() {
       </header>
       <div className="content">
         {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} />}
-        {page === "clients" && <ClientsPage clients={clients} query={query} setQuery={setQuery} mode={mode} setMode={setMode} results={results} onAdd={addClient} onRemove={(id) => setClients((current) => current.filter((client) => client.id !== id))} />}
+        {page === "clients" && <ClientsPage clients={clients} query={query} setQuery={setQuery} mode={mode} setMode={setMode} results={results} searching={searching} error={searchError} provider={footballProvider} onAdd={addClient} onRemove={(id) => setClients((current) => current.filter((client) => client.id !== id))} />}
         {page === "workers" && <WorkersPage workers={workers} onAdd={() => setWorkerOpen(true)} onRemove={(id) => setWorkers((current) => current.filter((worker) => worker.id !== id))} />}
         {page === "settings" && <SettingsPage onSaved={(message) => setToast(message)} />}
       </div>
@@ -125,16 +155,16 @@ function AgendaCalendar({ work, onAddWork, onOpenWork }: { work: WorkItem[]; onA
   const days = getWeekDays(anchor);
   return <section className="calendar-card agenda-calendar">
     <div className="calendar-head"><div><div className="eyebrow">Main agenda</div><h2>Weekly design schedule</h2><p>{weekLabel(anchor)} · Asia/Baku (UTC+4)</p></div><div className="agenda-actions"><button className="button" aria-label="Previous week" onClick={() => setAnchor(moveWeek(anchor, -1))}><ChevronLeft size={15} /></button><button className="button" onClick={() => setAnchor(new Date())}>Today</button><button className="button" aria-label="Next week" onClick={() => setAnchor(moveWeek(anchor, 1))}><ChevronRight size={15} /></button><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
-    <div className="calendar-grid">{days.map((day) => { const dayWork = work.filter((item) => item.startsAt && isSameDay(parseISO(item.startsAt), day)); return <div className={`day ${isSameDay(day, new Date()) ? "today" : ""}`} key={day.toISOString()}><div className="day-head"><span className="day-name">{format(day, "EEE")}</span><span className="day-number">{format(day, "d")}</span></div><div className="day-body">{dayWork.length ? dayWork.sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((item) => <button className="agenda-item" key={item.id} onClick={() => onOpenWork(item)}><div className="agenda-time">{format(parseISO(item.startsAt), "HH:mm")}</div><strong>{item.title}</strong><span>{item.client}</span><div className="badge">{item.status}</div></button>) : <button className="agenda-empty" onClick={onAddWork}><Plus size={13} />Add work</button>}</div></div>; })}</div>
+    <div className="calendar-grid">{days.map((day) => { const dayWork = work.filter((item) => item.startsAt && isSameDay(parseISO(item.startsAt), day)); return <div className={`day ${isSameDay(day, new Date()) ? "today" : ""}`} key={day.toISOString()}><div className="day-head"><span className="day-name">{format(day, "EEE")}</span><span className="day-number">{format(day, "d")}</span></div><div className="day-body">{dayWork.length ? dayWork.sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((item) => <button className="agenda-item" key={item.id} onClick={() => onOpenWork(item)}><div className="agenda-time">{format(parseISO(item.startsAt), "HH:mm")}</div>{item.selectedPlayer && <div className="agenda-player"><CircleUserRound size={11} />{item.selectedPlayer}</div>}<strong>{item.title}</strong><span>{item.competition || item.client}</span><div className="badge">{item.status}</div></button>) : <button className="agenda-empty" onClick={onAddWork}><Plus size={13} />Add work</button>}</div></div>; })}</div>
     {!work.length && <div className="agenda-empty-banner"><CalendarDays size={18} /><span>Your agenda is empty. Add only the work and matches you choose.</span></div>}
   </section>;
 }
 
-function ClientsPage({ clients, query, setQuery, mode, setMode, results, onAdd, onRemove }: { clients: FootballEntity[]; query: string; setQuery: (value: string) => void; mode: "club" | "player"; setMode: (mode: "club" | "player") => void; results: FootballEntity[]; onAdd: (entity: FootballEntity) => void; onRemove: (id: string) => void }) {
-  return <><section className="page-intro"><div><div className="eyebrow">Your roster</div><h2>My Clients</h2><p>Add only the players and clubs you actively design for.</p></div></section><section className="search-panel"><div className="search-row"><div className="search-box"><Search size={17} /><input aria-label="Search clients" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${mode === "club" ? "clubs" : "players"} by name`} /></div><div className="segmented"><button className={mode === "player" ? "active" : ""} onClick={() => setMode("player")}>Players</button><button className={mode === "club" ? "active" : ""} onClick={() => setMode("club")}>Clubs</button></div></div>{query.length >= 2 && <div className="results">{results.length ? results.map((entity) => <ClientCard entity={entity} action={<button className="mini-action" onClick={() => onAdd(entity)}><Plus size={14} />Add</button>} key={entity.id} />) : <div className="results-empty">No results found.</div>}</div>}</section><section className="panel"><PanelHeader title="Saved clients" note={`${clients.length} selected`} />{clients.length ? <div className="client-grid">{clients.map((entity) => <ClientCard entity={entity} action={<button className="icon-button subtle" aria-label={`Remove ${entity.name}`} onClick={() => onRemove(entity.id)}><Trash2 size={14} /></button>} key={entity.id} />)}</div> : <EmptyState icon={<CircleUserRound size={25} />} title="No clients selected" text="Search above and add a player or club. Nothing is added automatically." />}</section></>;
+function ClientsPage({ clients, query, setQuery, mode, setMode, results, searching, error, provider, onAdd, onRemove }: { clients: FootballEntity[]; query: string; setQuery: (value: string) => void; mode: "club" | "player"; setMode: (mode: "club" | "player") => void; results: FootballEntity[]; searching: boolean; error: string; provider: string; onAdd: (entity: FootballEntity) => void; onRemove: (id: string) => void }) {
+  return <><section className="page-intro"><div><div className="eyebrow">Your roster</div><h2>My Clients</h2><p>Search the football database. Selecting a client imports upcoming matches into your agenda.</p></div><span className={`provider-badge ${provider === "api-football" ? "live" : ""}`}>{provider === "api-football" ? "API-Football live" : "Demo data"}</span></section><section className="search-panel"><div className="search-row"><div className="search-box"><Search size={17} /><input aria-label="Search clients" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${mode === "club" ? "clubs" : "players"} — minimum 3 letters`} /></div><div className="segmented"><button className={mode === "player" ? "active" : ""} onClick={() => setMode("player")}>Players</button><button className={mode === "club" ? "active" : ""} onClick={() => setMode("club")}>Clubs</button></div></div>{query.length >= 3 && <div className="results">{searching ? <div className="results-empty">Searching the football database…</div> : error ? <div className="results-error">{error}</div> : results.length ? results.map((entity) => <ClientCard entity={entity} action={<button className="mini-action" onClick={() => onAdd(entity)}><Plus size={14} />Add & import games</button>} key={entity.id} />) : <div className="results-empty">No results found.</div>}</div>}</section><section className="panel"><PanelHeader title="Saved clients" note={`${clients.length} selected`} />{clients.length ? <div className="client-grid">{clients.map((entity) => <ClientCard entity={entity} action={<button className="icon-button subtle" aria-label={`Remove ${entity.name}`} onClick={() => onRemove(entity.id)}><Trash2 size={14} /></button>} key={entity.id} />)}</div> : <EmptyState icon={<CircleUserRound size={25} />} title="No clients selected" text="Search above and add a player or club. Their upcoming matches will appear in the agenda." />}</section></>;
 }
 
-function ClientCard({ entity, action }: { entity: FootballEntity; action: React.ReactNode }) { return <div className="client-card"><div className="crest large">{entity.crest}</div><div><span className="entity-type">{entity.type}</span><strong>{entity.name}</strong><small>{entity.subtitle}{entity.club ? ` · ${entity.club}` : ""}</small></div>{action}</div>; }
+function ClientCard({ entity, action }: { entity: FootballEntity; action: React.ReactNode }) { return <div className="client-card"><div className={`crest large ${entity.image ? "has-image" : ""}`} style={entity.image ? { backgroundImage: `url(${entity.image})` } : undefined}>{entity.image ? "" : entity.crest}</div><div><span className="entity-type">{entity.type}</span><strong>{entity.name}</strong><small>{entity.subtitle}{entity.club ? ` · ${entity.club}` : ""}</small></div>{action}</div>; }
 
 function WorkersPage({ workers, onAdd, onRemove }: { workers: Worker[]; onAdd: () => void; onRemove: (id: string) => void }) { return <><section className="page-intro"><div><div className="eyebrow">Assignment team</div><h2>Workers</h2><p>Workers created here become available in every Assign menu.</p></div><button className="button accent" onClick={onAdd}><UserRoundPlus size={16} />Create worker</button></section><section className="panel">{workers.length ? <div className="worker-grid">{workers.map((worker) => <article className="worker-card" key={worker.id}><div className="avatar worker-avatar">{worker.name[0]}{worker.surname[0]}</div><div><strong>{worker.name} {worker.surname}</strong><span>{worker.role}</span></div><button className="icon-button subtle" onClick={() => onRemove(worker.id)} aria-label={`Remove ${worker.name}`}><Trash2 size={14} /></button></article>)}</div> : <EmptyState icon={<Users size={25} />} title="No workers created" text="Create a worker with a name, surname and role to start assigning work." action="Create worker" onAction={onAdd} />}</section></>; }
 
@@ -147,9 +177,9 @@ function SettingsPage({ onSaved }: { onSaved: (message: string) => void }) {
 
 function WorkerModal({ onClose, onAdd }: { onClose: () => void; onAdd: (worker: Worker) => void }) { const [name, setName] = useState(""); const [surname, setSurname] = useState(""); const [role, setRole] = useState("Graphic Designer"); return <Modal title="Create worker" eyebrow="Assignment team" onClose={onClose}><Field label="Name"><input autoFocus value={name} onChange={(event) => setName(event.target.value)} /></Field><Field label="Surname"><input value={surname} onChange={(event) => setSurname(event.target.value)} /></Field><Field label="Role"><input value={role} onChange={(event) => setRole(event.target.value)} /></Field><div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!name.trim() || !surname.trim() || !role.trim()} onClick={() => onAdd({ id: crypto.randomUUID(), name: name.trim(), surname: surname.trim(), role: role.trim() })}>Create worker</button></div></Modal>; }
 
-function WorkModal({ clients, workers, onClose, onAdd }: { clients: FootballEntity[]; workers: Worker[]; onClose: () => void; onAdd: (item: WorkItem) => void }) { const [title, setTitle] = useState(""); const [client, setClient] = useState(clients[0]?.name || ""); const [workerId, setWorkerId] = useState(""); const [startsAt, setStartsAt] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd'T'15:00")); return <Modal title="Create work" eyebrow="Manual design task" onClose={onClose}><Field label="Work title"><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Player announcement artwork" /></Field><Field label="Agenda date and time"><input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></Field><Field label="Client"><select value={client} onChange={(event) => setClient(event.target.value)}><option value="">No client</option>{clients.map((entry) => <option key={entry.id}>{entry.name}</option>)}</select></Field><Field label="Assign worker"><select value={workerId} onChange={(event) => setWorkerId(event.target.value)}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field><div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!title.trim() || !startsAt} onClick={() => onAdd({ id: crypto.randomUUID(), title: title.trim(), client: client || "No client", workerId, startsAt: new Date(startsAt).toISOString(), status: workerId ? "Assigned" : "Unassigned" })}>Add to agenda</button></div></Modal>; }
+function WorkModal({ clients, workers, onClose, onAdd }: { clients: FootballEntity[]; workers: Worker[]; onClose: () => void; onAdd: (item: WorkItem) => void }) { const [title, setTitle] = useState(""); const [client, setClient] = useState(clients[0]?.name || ""); const [workerId, setWorkerId] = useState(""); const [startsAt, setStartsAt] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd'T'15:00")); return <Modal title="Create work" eyebrow="Manual design task" onClose={onClose}><Field label="Work title"><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Player announcement artwork" /></Field><Field label="Agenda date and time"><input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></Field><Field label="Client"><select value={client} onChange={(event) => setClient(event.target.value)}><option value="">No client</option>{clients.map((entry) => <option key={entry.id}>{entry.name}</option>)}</select></Field><Field label="Assign worker"><select value={workerId} onChange={(event) => setWorkerId(event.target.value)}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field><div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!title.trim() || !startsAt} onClick={() => onAdd({ id: crypto.randomUUID(), kind: "manual", title: title.trim(), client: client || "No client", workerId, startsAt: new Date(startsAt).toISOString(), status: workerId ? "Assigned" : "Unassigned", priority: "Medium" })}>Add to agenda</button></div></Modal>; }
 
-function AssignmentDrawer({ item, workers, onClose, onSave }: { item: WorkItem; workers: Worker[]; onClose: () => void; onSave: (item: WorkItem) => void }) { const [draft, setDraft] = useState(item); return <Modal title={item.title} eyebrow={item.client} onClose={onClose}><div className="assignment-summary"><BriefcaseBusiness size={19} /><span>Assign this work to a worker created in the Workers panel.</span></div><Field label="Assign worker"><select value={draft.workerId} onChange={(event) => setDraft({ ...draft, workerId: event.target.value, status: event.target.value ? "Assigned" : "Unassigned" })}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field><Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as WorkItem["status"] })}><option>Unassigned</option><option>Assigned</option><option>In Progress</option><option>Completed</option></select></Field>{!workers.length && <p className="inline-warning">Create a worker first; the assignment list is currently empty.</p>}<div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" onClick={() => onSave(draft)}>Save assignment</button></div></Modal>; }
+function AssignmentDrawer({ item, workers, onClose, onSave }: { item: WorkItem; workers: Worker[]; onClose: () => void; onSave: (item: WorkItem) => void }) { const [draft, setDraft] = useState(item); return <Modal title={item.title} eyebrow={item.client} onClose={onClose}>{item.kind === "fixture" && <div className="fixture-details"><div><span>Competition</span><strong>{item.competition || "Unknown"}</strong></div><div><span>Kickoff</span><strong>{format(parseISO(item.startsAt), "MMM d · HH:mm")}</strong></div><div><span>Venue</span><strong>{item.venue || "Not available"}</strong></div><div><span>Round</span><strong>{item.round || "Not available"}</strong></div></div>}<div className="assignment-summary"><BriefcaseBusiness size={19} /><span>Assign this work to a worker created in the Workers panel.</span></div><Field label="Assign worker"><select value={draft.workerId} onChange={(event) => setDraft({ ...draft, workerId: event.target.value, status: event.target.value ? "Assigned" : "Unassigned" })}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field><Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as WorkItem["status"] })}><option>Unassigned</option><option>Assigned</option><option>In Progress</option><option>Ready for Review</option><option>Completed</option><option>Cancelled</option></select></Field>{!workers.length && <p className="inline-warning">Create a worker first; the assignment list is currently empty.</p>}<div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" onClick={() => onSave(draft)}>Save assignment</button></div></Modal>; }
 
 function NotificationMenu({ work, onClose }: { work: WorkItem[]; onClose: () => void }) { const latest = work[work.length - 1]; return <div className="popover notification-menu"><div className="popover-head"><strong>Notifications</strong><button aria-label="Close" onClick={onClose}><X size={14} /></button></div>{latest ? <div className="notification-item"><div className="notice-dot" /><div><strong>{latest.title}</strong><span>{latest.status} · {latest.client}</span></div></div> : <div className="notification-empty"><Bell size={20} /><strong>You’re all caught up</strong><span>No notifications yet.</span></div>}</div>; }
 

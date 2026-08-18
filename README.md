@@ -45,6 +45,17 @@ The current interface deliberately runs in demo mode without a database, making 
 
 `src/lib/football/provider.ts` defines the provider contract. The bundled demo provider is selected when `FOOTBALL_API_PROVIDER=demo`. API keys are server-only and must never use a `NEXT_PUBLIC_` prefix.
 
+The production adapter uses API-Football. Create a free account at [dashboard.api-football.com](https://dashboard.api-football.com), then configure:
+
+```env
+FOOTBALL_API_PROVIDER="api-football"
+FOOTBALL_API_KEY="your-server-side-key"
+FOOTBALL_API_BASE_URL="https://v3.football.api-sports.io"
+FOOTBALL_API_SEASON="2026"
+```
+
+Search requests are debounced and cached for one hour to protect the free quota. Selecting a club imports its next 20 fixtures. Selecting a player resolves the player's current club from season statistics, imports that club's next 20 fixtures, labels each agenda item with the selected player, and adds the player to My Clients.
+
 ## Deployment
 
 1. Import the repository in Vercel.
