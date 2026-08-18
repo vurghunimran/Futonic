@@ -51,7 +51,7 @@ The current interface deliberately runs in demo mode without a database, making 
 2. Add all variables from `.env.example`.
 3. Generate strong values for `AUTH_SECRET`, `CRON_SECRET`, and `TELEGRAM_WEBHOOK_SECRET`.
 4. Connect PostgreSQL and run the Prisma schema migration.
-5. Deploy. `vercel.json` schedules notification processing hourly and fixture sync every six hours.
+5. Deploy. `vercel.json` uses two once-daily UTC schedules so the project can deploy on Vercel's entry plan: notification processing at 01:05 UTC and fixture sync at 01:20 UTC. Upgrade the Vercel plan before changing these back to hourly or six-hour schedules.
 
 Cron requests must include `Authorization: Bearer <CRON_SECRET>`. Both jobs are designed as idempotent boundaries; notification delivery should use `NotificationLog.idempotencyKey` before enabling external email or Telegram sends.
 
