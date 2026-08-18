@@ -1,0 +1,5 @@
+import { describe,expect,it } from "vitest";
+import { getTimingState,moveWeek,weekBounds } from "./time";
+import type { AgendaItem } from "./types";
+const item=(startsAt:string,status:AgendaItem["status"]="Assigned"):AgendaItem=>({id:"1",kind:"fixture",title:"Match",startsAt,status,priority:"High"});
+describe("calendar timing",()=>{it("starts weeks on Monday",()=>expect(weekBounds(new Date("2026-08-19T12:00:00Z")).start.getDay()).toBe(1));it("moves exactly one week",()=>expect(moveWeek(new Date("2026-08-19"),1).toISOString().slice(0,10)).toBe("2026-08-26"));it("warns inside 48 hours",()=>expect(getTimingState(item("2026-08-20T11:00:00Z"),new Date("2026-08-19T12:00:00Z")).kind).toBe("warning"));it("marks incomplete past work overdue",()=>expect(getTimingState(item("2026-08-19T11:00:00Z"),new Date("2026-08-19T12:00:00Z")).kind).toBe("overdue"));it("never marks completed work overdue",()=>expect(getTimingState(item("2026-08-19T11:00:00Z","Completed"),new Date("2026-08-19T12:00:00Z")).kind).toBe("safe"))});
