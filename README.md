@@ -42,7 +42,7 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
   -d '{"url":"https://<YOUR_VERCEL_DOMAIN>/api/telegram/webhook","secret_token":"<TELEGRAM_WEBHOOK_SECRET>","allowed_updates":["message"]}'
 ```
 
-The bot confirms a successful connection. The daily Vercel cron sends one duplicate-safe Telegram reminder when a match enters the 24–48-hour window. Agenda changes are synchronized to PostgreSQL after each edit, so reminders work even when the dashboard is closed.
+The bot confirms a successful connection. When a client is added, any imported match starting within 48 hours triggers an immediate Telegram reminder. The daily Vercel cron also checks every future match inside the same 48-hour window. Both paths share a delivery log, so the same match is not sent twice. Agenda changes are synchronized to PostgreSQL after each edit, so scheduled reminders work even when the dashboard is closed.
 
 ## Database
 
