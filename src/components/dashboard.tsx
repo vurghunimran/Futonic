@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, format, isSameDay, parseISO } from "date-fns";
 import {
@@ -44,6 +44,7 @@ export function Dashboard() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [footballProvider, setFootballProvider] = useState("demo");
+  const showToast = useCallback((message: string) => setToast(message), []);
 
   useEffect(() => {
     try {
@@ -68,7 +69,7 @@ export function Dashboard() {
       fetch("/api/agenda/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: work }) })
         .then(async (response) => ({ response, data: await response.json().catch(() => ({})) }))
         .then(({ response, data }) => {
-          if (!response.ok) return;
+          if (!response.ok) return setToast(data.error || "Agenda could not synchronize");
           if (data.remindersSent) setToast(data.remindersSent === 1 ? "Telegram match reminder sent" : `${data.remindersSent} Telegram match reminders sent`);
           else if (data.remindersFailed) setToast("Telegram reminder failed. Reconnect the bot in Settings.");
           else if (data.urgentMatchCount && !data.telegramConnected) setToast("Urgent match saved. Connect Telegram in Settings to receive reminders.");
@@ -157,7 +158,7 @@ export function Dashboard() {
         {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} onMoveWork={(item, amount) => { setWork((current) => current.map((entry) => entry.id === item.id ? { ...entry, startsAt: addDays(parseISO(entry.startsAt), amount).toISOString() } : entry)); setToast(`${item.title} moved ${amount < 0 ? "one day earlier" : "one day later"}`); }} onDeleteWork={(item) => { setWork((current) => current.filter((entry) => entry.id !== item.id)); setToast(`${item.title} removed from agenda`); }} />}
         {page === "clients" && <ClientsPage clients={clients} query={query} setQuery={setQuery} mode={mode} setMode={setMode} results={results} searching={searching} error={searchError} provider={footballProvider} onAdd={addClient} onRemove={removeClient} />}
         {page === "workers" && <WorkersPage workers={workers} onAdd={() => setWorkerOpen(true)} onRemove={(id) => setWorkers((current) => current.filter((worker) => worker.id !== id))} />}
-        {page === "settings" && <SettingsPage onSaved={(message) => setToast(message)} />}
+        {page === "settings" && <SettingsPage onSaved={showToast} />}
       </div>
     </main>
     {workerOpen && <WorkerModal onClose={() => setWorkerOpen(false)} onAdd={(worker) => { setWorkers((current) => [...current, worker]); setWorkerOpen(false); setToast("Worker created"); }} />}
@@ -195,13 +196,24 @@ function ClientCard({ entity, action }: { entity: FootballEntity; action: React.
 function WorkersPage({ workers, onAdd, onRemove }: { workers: Worker[]; onAdd: () => void; onRemove: (id: string) => void }) { return <><section className="page-intro"><div><div className="eyebrow">Assignment team</div><h2>Workers</h2><p>Workers created here become available in every Assign menu.</p></div><button className="button accent" onClick={onAdd}><UserRoundPlus size={16} />Create worker</button></section><section className="panel">{workers.length ? <div className="worker-grid">{workers.map((worker) => <article className="worker-card" key={worker.id}><div className="avatar worker-avatar">{worker.name[0]}{worker.surname[0]}</div><div><strong>{worker.name} {worker.surname}</strong><span>{worker.role}</span></div><button className="icon-button subtle" onClick={() => onRemove(worker.id)} aria-label={`Remove ${worker.name}`}><Trash2 size={14} /></button></article>)}</div> : <EmptyState icon={<Users size={25} />} title="No workers created" text="Create a worker with a name, surname and role to start assigning work." action="Create worker" onAction={onAdd} />}</section></>; }
 
 function SettingsPage({ onSaved }: { onSaved: (message: string) => void }) {
-  const [phone, setPhone] = useState("+994 50 123 45 67");
+  const [phone, setPhone] = useState("");
   const [activation, setActivation] = useState("");
   const [telegramConnected, setTelegramConnected] = useState(false);
-  useEffect(() => { fetch("/api/telegram/activation").then(async (response) => ({ response, data: await response.json() })).then(({ response, data }) => { if (response.ok) { setActivation(data.telegramUrl); setTelegramConnected(data.connected); } }).catch(() => undefined); }, []);
+  const [accountLoading, setAccountLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/settings/account").then(async (response) => ({ response, data: await response.json().catch(() => ({})) })),
+      fetch("/api/telegram/activation").then(async (response) => ({ response, data: await response.json().catch(() => ({})) })),
+    ]).then(([account, telegram]) => {
+      if (account.response.ok) setPhone(account.data.phone || ""); else onSaved(account.data.error || "Could not load account");
+      if (telegram.response.ok) { setActivation(telegram.data.telegramUrl); setTelegramConnected(telegram.data.connected); }
+      else onSaved(telegram.data.error || "Could not load Telegram status");
+    }).catch(() => onSaved("Could not load account settings")).finally(() => setAccountLoading(false));
+  }, [onSaved]);
   async function regenerateActivation() { const response = await fetch("/api/telegram/activation", { method: "POST" }); const data = await response.json(); if (response.ok) { setActivation(data.telegramUrl); setTelegramConnected(false); onSaved("New activation link generated"); } else onSaved(data.error || "Could not generate activation link"); }
-  async function save(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const response = await fetch("/api/settings/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phone, currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword") }) }); onSaved(response.ok ? "Account settings saved" : "Could not save account settings"); }
-  return <><section className="page-intro"><div><div className="eyebrow">Account</div><h2>Settings</h2><p>Manage administrator access and Telegram activation.</p></div></section><div className="settings-grid"><section className="panel settings-card"><PanelHeader title="Contact & security" note="Update your sign-in details" /><form onSubmit={save}><Field label="Phone number"><input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field><Field label="Current password"><input name="currentPassword" type="password" placeholder="Enter current password" /></Field><Field label="New password"><input name="newPassword" type="password" placeholder="At least 8 characters" minLength={8} /></Field><button className="button accent settings-save">Save changes</button></form></section><section className="panel settings-card"><PanelHeader title="Telegram activation" note={telegramConnected ? "Connected" : "Connect the administrator account"} /><Field label="Activation link"><div className="copy-field"><input value={activation} placeholder="Configure Telegram environment variables" readOnly /><button className="icon-button" disabled={!activation} onClick={() => { navigator.clipboard.writeText(activation); onSaved("Activation link copied"); }}><Copy size={15} /></button></div></Field><p className="settings-help">{telegramConnected ? "Telegram notifications are active. Generate a new link only if you want to connect another Telegram chat." : "Open this link and tap Start in Telegram to activate match reminders."}</p><button className="button" onClick={regenerateActivation}>Generate new link</button></section></div></>;
+  async function save(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const response = await fetch("/api/settings/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phone }) }); const data = await response.json().catch(() => ({})); if (response.ok) { setPhone(data.phone || phone); onSaved("Phone number saved to your account"); } else onSaved(data.error || "Could not save account settings"); }
+  async function sendTestNotification() { const response = await fetch("/api/telegram/test", { method: "POST" }); const data = await response.json().catch(() => ({})); onSaved(response.ok ? "Test notification sent to Telegram" : data.error || "Test notification failed"); }
+  return <><section className="page-intro"><div><div className="eyebrow">Account</div><h2>Settings</h2><p>Manage administrator access and Telegram activation.</p></div></section><div className="settings-grid"><section className="panel settings-card"><PanelHeader title="Contact & security" note="Your database account" /><form onSubmit={save}><Field label="Phone number"><input type="tel" value={phone} disabled={accountLoading} placeholder={accountLoading ? "Loading your account…" : "+994 50 123 45 67"} onChange={(event) => setPhone(event.target.value)} /></Field><p className="settings-help">This is the number used to sign in and identify the Telegram-connected account.</p><button className="button accent settings-save" disabled={accountLoading || !phone}>Save changes</button></form></section><section className="panel settings-card"><PanelHeader title="Telegram activation" note={telegramConnected ? "Connected to this account" : "Connect the administrator account"} /><Field label="Activation link"><div className="copy-field"><input value={activation} placeholder="Configure Telegram environment variables" readOnly /><button className="icon-button" disabled={!activation} onClick={() => { navigator.clipboard.writeText(activation); onSaved("Activation link copied"); }}><Copy size={15} /></button></div></Field><p className="settings-help">{telegramConnected ? `Telegram notifications are active for ${phone || "this account"}.` : "Open this link and tap Start in Telegram to activate match reminders."}</p><div className="drawer-actions"><button className="button" onClick={regenerateActivation}>Generate new link</button><button className="button accent" disabled={!telegramConnected} onClick={sendTestNotification}>Send test notification</button></div></section></div></>;
 }
 
 function WorkerModal({ onClose, onAdd }: { onClose: () => void; onAdd: (worker: Worker) => void }) { const [name, setName] = useState(""); const [surname, setSurname] = useState(""); const [role, setRole] = useState("Graphic Designer"); return <Modal title="Create worker" eyebrow="Assignment team" onClose={onClose}><Field label="Name"><input autoFocus value={name} onChange={(event) => setName(event.target.value)} /></Field><Field label="Surname"><input value={surname} onChange={(event) => setSurname(event.target.value)} /></Field><Field label="Role"><input value={role} onChange={(event) => setRole(event.target.value)} /></Field><div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!name.trim() || !surname.trim() || !role.trim()} onClick={() => onAdd({ id: crypto.randomUUID(), name: name.trim(), surname: surname.trim(), role: role.trim() })}>Create worker</button></div></Modal>; }

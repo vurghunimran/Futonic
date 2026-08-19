@@ -23,6 +23,6 @@ export async function POST(request: Request) {
     prisma.user.update({ where: { id: user.id }, data: { telegramChatId: String(chatId), telegramActivatedAt: new Date(), telegramActivationToken: null } }),
     prisma.notificationPreference.upsert({ where: { userId: user.id }, update: { telegram: true, reminder48h: true }, create: { userId: user.id, telegram: true, reminder48h: true } }),
   ]);
-  await sendTelegramMessage(String(chatId), "✅ Futonic notifications are active. You will receive a reminder when a match enters the 24–48 hour window.");
+  await sendTelegramMessage(String(chatId), "✅ Futonic notifications are active. You will receive an immediate reminder for any upcoming match within 48 hours.");
   return NextResponse.json({ ok: true, activated: true });
 }
