@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { databaseConfigured, prisma } from "@/lib/prisma";
+import { databaseConfigured, databaseErrorMessage, prisma } from "@/lib/prisma";
 import { normalizePhone, phoneLookupValues } from "@/lib/phone";
 
 const schema = z.object({
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Registration database error", error);
-    return NextResponse.json({ error: "The account database is unavailable. Check DATABASE_URL and apply the Prisma schema." }, { status: 503 });
+    return NextResponse.json({ error: databaseErrorMessage(error) }, { status: 503 });
   }
   const botUsername = process.env.TELEGRAM_BOT_USERNAME;
   const telegramUrl = botUsername ? `https://t.me/${botUsername.replace(/^@/, "")}?start=${activationToken}` : null;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { databaseConfigured, prisma } from "@/lib/prisma";
+import { databaseConfigured, databaseErrorMessage, prisma } from "@/lib/prisma";
 import { normalizePhone, phoneLookupValues } from "@/lib/phone";
 
 const schema = z.object({ phone: z.string().trim().regex(/^\+?[0-9 ()-]{8,24}$/) });
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     if (user && user.phone !== phone) user = await prisma.user.update({ where: { id: user.id }, data: { phone } });
   } catch (error) {
     console.error("Sign-in database error", error);
-    return NextResponse.json({ error: "The account database is unavailable. Check DATABASE_URL and apply the Prisma schema." }, { status: 503 });
+    return NextResponse.json({ error: databaseErrorMessage(error) }, { status: 503 });
   }
   if (!user) return NextResponse.json({ error: "This telephone number is not registered. Create an account first." }, { status: 401 });
   const response = NextResponse.json({ ok: true });

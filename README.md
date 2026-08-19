@@ -78,6 +78,8 @@ Search requests are debounced and cached for one hour to protect the free quota.
 4. Connect PostgreSQL and run the Prisma schema migration.
 5. Deploy. `vercel.json` uses two once-daily UTC schedules so the project can deploy on Vercel's entry plan: notification processing at 01:05 UTC and fixture sync at 01:20 UTC. Upgrade the Vercel plan before changing these back to hourly or six-hour schedules.
 
+Vercel uses the `vercel-build` script to apply the Prisma schema before building the application. Keep `DATABASE_URL` available to the Production and Preview environments. Use Neon's pooled connection string (its hostname normally contains `-pooler`) and include `sslmode=require`; paste the value into Vercel without surrounding quotation marks.
+
 Cron requests must include `Authorization: Bearer <CRON_SECRET>`. Vercel adds this header automatically to configured cron invocations. Telegram delivery records `NotificationLog.idempotencyKey`, preventing the same match reminder from being sent twice.
 
 ## Verification
