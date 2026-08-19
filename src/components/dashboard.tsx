@@ -139,7 +139,7 @@ export function Dashboard() {
         </div>
       </header>
       <div className="content">
-        {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} />}
+        {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} onDeleteWork={(item) => { setWork((current) => current.filter((entry) => entry.id !== item.id)); setToast(`${item.title} removed from agenda`); }} />}
         {page === "clients" && <ClientsPage clients={clients} query={query} setQuery={setQuery} mode={mode} setMode={setMode} results={results} searching={searching} error={searchError} provider={footballProvider} onAdd={addClient} onRemove={removeClient} />}
         {page === "workers" && <WorkersPage workers={workers} onAdd={() => setWorkerOpen(true)} onRemove={(id) => setWorkers((current) => current.filter((worker) => worker.id !== id))} />}
         {page === "settings" && <SettingsPage onSaved={(message) => setToast(message)} />}
@@ -152,20 +152,20 @@ export function Dashboard() {
   </div>;
 }
 
-function DashboardHome({ clients, workers, work, onSearch, onAddWorker, onAddWork, onOpenWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onSearch: () => void; onAddWorker: () => void; onAddWork: () => void; onOpenWork: (item: WorkItem) => void }) {
+function DashboardHome({ clients, workers, work, onSearch, onAddWorker, onAddWork, onOpenWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onSearch: () => void; onAddWorker: () => void; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onDeleteWork: (item: WorkItem) => void }) {
   return <>
     <section className="overview"><div className="welcome"><div className="eyebrow">Futonic workspace</div><h2>Your creative roster, your way.</h2><p>Only clients, workers and work selected by you appear here.</p></div><Metric label="My clients" value={String(clients.length)} note="Players and clubs" /><Metric label="Workers" value={String(workers.length)} note="Available to assign" /><Metric label="Open work" value={String(work.filter((item) => item.status !== "Completed").length)} note="Needs attention" /></section>
     <section className="quick-actions"><button onClick={onSearch}><Search size={19} /><span><strong>Add a client</strong><small>Find a player or club</small></span></button><button onClick={onAddWorker}><UserRoundPlus size={19} /><span><strong>Create worker</strong><small>Build your assignment team</small></span></button><button onClick={onAddWork}><Plus size={19} /><span><strong>Create work</strong><small>Add a manual design task</small></span></button></section>
-    <AgendaCalendar work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} />
+    <AgendaCalendar work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} onDeleteWork={onDeleteWork} />
   </>;
 }
 
-function AgendaCalendar({ work, onAddWork, onOpenWork }: { work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void }) {
+function AgendaCalendar({ work, onAddWork, onOpenWork, onDeleteWork }: { work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onDeleteWork: (item: WorkItem) => void }) {
   const [anchor, setAnchor] = useState(new Date());
   const days = getWeekDays(anchor);
   return <section className="calendar-card agenda-calendar">
     <div className="calendar-head"><div><div className="eyebrow">Main agenda</div><h2>Weekly design schedule</h2><p>{weekLabel(anchor)} · Asia/Baku (UTC+4)</p></div><div className="agenda-actions"><button className="button" aria-label="Previous week" onClick={() => setAnchor(moveWeek(anchor, -1))}><ChevronLeft size={15} /></button><button className="button" onClick={() => setAnchor(new Date())}>Today</button><button className="button" aria-label="Next week" onClick={() => setAnchor(moveWeek(anchor, 1))}><ChevronRight size={15} /></button><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
-    <div className="calendar-grid">{days.map((day) => { const dayWork = work.filter((item) => item.startsAt && isSameDay(parseISO(item.startsAt), day)); return <div className={`day ${isSameDay(day, new Date()) ? "today" : ""}`} key={day.toISOString()}><div className="day-head"><span className="day-name">{format(day, "EEE")}</span><span className="day-number">{format(day, "d")}</span></div><div className="day-body">{dayWork.length ? dayWork.sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((item) => <button className="agenda-item" key={item.id} onClick={() => onOpenWork(item)}><div className="agenda-time">{format(parseISO(item.startsAt), "HH:mm")}</div>{item.selectedPlayer && <div className="agenda-player"><CircleUserRound size={11} />{item.selectedPlayer}</div>}<strong>{item.title}</strong><span>{item.competition || item.client}</span><div className="badge">{item.status}</div></button>) : <button className="agenda-empty" onClick={onAddWork}><Plus size={13} />Add work</button>}</div></div>; })}</div>
+    <div className="calendar-grid">{days.map((day) => { const dayWork = work.filter((item) => item.startsAt && isSameDay(parseISO(item.startsAt), day)); return <div className={`day ${isSameDay(day, new Date()) ? "today" : ""}`} key={day.toISOString()}><div className="day-head"><span className="day-name">{format(day, "EEE")}</span><span className="day-number">{format(day, "d")}</span></div><div className="day-body">{dayWork.length ? dayWork.sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((item) => <div className="agenda-item-wrap" key={item.id}><button className="agenda-delete" aria-label={`Delete ${item.title}`} title="Delete from agenda" onClick={() => onDeleteWork(item)}><X size={12} /></button><button className="agenda-item" onClick={() => onOpenWork(item)}><div className="agenda-time">{format(parseISO(item.startsAt), "HH:mm")}</div>{item.selectedPlayer && <div className="agenda-player"><CircleUserRound size={11} />{item.selectedPlayer}</div>}<strong>{item.title}</strong><span>{item.competition || item.client}</span><div className="badge">{item.status}</div></button></div>) : <button className="agenda-empty" onClick={onAddWork}><Plus size={13} />Add work</button>}</div></div>; })}</div>
     {!work.length && <div className="agenda-empty-banner"><CalendarDays size={18} /><span>Your agenda is empty. Add only the work and matches you choose.</span></div>}
   </section>;
 }
