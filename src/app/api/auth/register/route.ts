@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   const botUsername = process.env.TELEGRAM_BOT_USERNAME;
   let telegramWarning: string | null = null;
   if (botUsername && process.env.TELEGRAM_BOT_TOKEN) {
-    try { await configureTelegramWebhook(request.url); }
+    try { await configureTelegramWebhook(request); }
     catch (error) { telegramWarning = error instanceof Error ? error.message : "Telegram webhook setup failed"; }
   }
   const telegramUrl = botUsername ? `https://t.me/${botUsername.replace(/^@/, "")}?start=${activationToken}` : null;

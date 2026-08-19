@@ -11,7 +11,7 @@ async function activation(request: Request, regenerate: boolean) {
   if (!databaseConfigured() || !userId || !username) {
     return NextResponse.json({ error: "Telegram requires DATABASE_URL and TELEGRAM_BOT_USERNAME." }, { status: 503 });
   }
-  try { await configureTelegramWebhook(request.url); }
+  try { await configureTelegramWebhook(request); }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Telegram webhook setup failed" }, { status: 502 }); }
   const current = await prisma.user.findUnique({ where: { id: userId } });
   if (!current) return NextResponse.json({ error: "Account not found." }, { status: 404 });
