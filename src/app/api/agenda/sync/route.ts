@@ -42,10 +42,22 @@ export async function POST(request: Request) {
   ]);
   const now = new Date();
   const until = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const urgentMatchCount = parsed.data.items.filter((item) => {
+    const startsAt = new Date(item.startsAt);
+    return (item.kind === "fixture" || Boolean(item.home && item.away)) && startsAt > now && startsAt <= until && item.status !== "Completed" && item.status !== "Cancelled";
+  }).length;
+  const account = await prisma.user.findUnique({ where: { id: userId }, select: { telegramChatId: true } });
   const urgentMatches = await prisma.agendaItem.findMany({
     where: { id: { in: ids }, userId, workType: "match", startsAt: { gt: now, lte: until }, status: { notIn: ["COMPLETED", "CANCELLED"] }, user: { telegramChatId: { not: null }, preferences: { telegram: true, reminder48h: true } } },
     include: { user: true },
   });
   const reminders = await Promise.all(urgentMatches.map(sendMatchReminder));
-  return NextResponse.json({ ok: true, synced: parsed.data.items.length, remindersSent: reminders.filter((result) => result === "sent").length });
+  return NextResponse.json({
+    ok: true,
+    synced: parsed.data.items.length,
+    remindersSent: reminders.filter((result) => result === "sent").length,
+    remindersFailed: reminders.filter((result) => result === "failed").length,
+    urgentMatchCount,
+    telegramConnected: Boolean(account?.telegramChatId),
+  });
 }

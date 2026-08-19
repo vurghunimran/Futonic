@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { databaseConfigured, databaseErrorMessage, prisma } from "@/lib/prisma";
 import { normalizePhone, phoneLookupValues } from "@/lib/phone";
+import { configureTelegramWebhook } from "@/lib/telegram";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -37,8 +38,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: databaseErrorMessage(error) }, { status: 503 });
   }
   const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+  let telegramWarning: string | null = null;
+  if (botUsername && process.env.TELEGRAM_BOT_TOKEN) {
+    try { await configureTelegramWebhook(request.url); }
+    catch (error) { telegramWarning = error instanceof Error ? error.message : "Telegram webhook setup failed"; }
+  }
   const telegramUrl = botUsername ? `https://t.me/${botUsername.replace(/^@/, "")}?start=${activationToken}` : null;
-  const response = NextResponse.json({ ok: true, accountCreated, telegramUrl, telegramConfigured: Boolean(botUsername) });
+  const response = NextResponse.json({ ok: true, accountCreated, telegramUrl, telegramConfigured: Boolean(botUsername) && !telegramWarning, telegramWarning });
   response.cookies.set("futonic_session", "admin", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 30, path: "/" });
   response.cookies.set("futonic_profile", Buffer.from(JSON.stringify({ ...parsed.data, phone, activationToken })).toString("base64url"), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 30, path: "/" });
   response.cookies.set("futonic_user_id", userId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 30, path: "/" });

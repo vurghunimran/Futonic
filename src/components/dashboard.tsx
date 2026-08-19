@@ -65,7 +65,15 @@ export function Dashboard() {
   useEffect(() => {
     if (!storageReady) return;
     const timeout = setTimeout(() => {
-      fetch("/api/agenda/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: work }) }).catch(() => undefined);
+      fetch("/api/agenda/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: work }) })
+        .then(async (response) => ({ response, data: await response.json().catch(() => ({})) }))
+        .then(({ response, data }) => {
+          if (!response.ok) return;
+          if (data.remindersSent) setToast(data.remindersSent === 1 ? "Telegram match reminder sent" : `${data.remindersSent} Telegram match reminders sent`);
+          else if (data.remindersFailed) setToast("Telegram reminder failed. Reconnect the bot in Settings.");
+          else if (data.urgentMatchCount && !data.telegramConnected) setToast("Urgent match saved. Connect Telegram in Settings to receive reminders.");
+        })
+        .catch(() => undefined);
     }, 500);
     return () => clearTimeout(timeout);
   }, [work, storageReady]);

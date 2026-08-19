@@ -26,6 +26,7 @@ export default function LoginPage() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) return setError(result.error || "We could not continue. Check your details.");
+      if (result.telegramWarning) return setError(`Account saved, but Telegram could not connect: ${result.telegramWarning}`);
       if (result.telegramUrl) window.open(result.telegramUrl, "_blank", "noopener,noreferrer");
       router.push("/dashboard");
       router.refresh();
