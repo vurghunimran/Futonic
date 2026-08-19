@@ -73,6 +73,7 @@ export function Dashboard() {
           if (data.remindersSent) setToast(data.remindersSent === 1 ? "Telegram match reminder sent" : `${data.remindersSent} Telegram match reminders sent`);
           else if (data.remindersFailed) setToast("Telegram reminder failed. Reconnect the bot in Settings.");
           else if (data.urgentMatchCount && !data.telegramConnected) setToast("Urgent match saved. Connect Telegram in Settings to receive reminders.");
+          else if (data.ignoredLegacyItems) setToast("Agenda synchronized; an incomplete legacy card was ignored.");
         })
         .catch(() => undefined);
     }, 500);
