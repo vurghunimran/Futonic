@@ -15,17 +15,26 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
-    const response = await fetch(mode === "register" ? "/api/auth/register" : "/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    const result = await response.json();
-    setLoading(false);
-    if (!response.ok) return setError(result.error || "We could not continue. Check your details.");
-    if (result.telegramUrl) window.open(result.telegramUrl, "_blank", "noopener,noreferrer");
-    router.push("/dashboard");
-    router.refresh();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(mode === "register" ? "/api/auth/register" : "/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return setError(result.error || "We could not continue. Check your details.");
+      if (result.telegramUrl) window.open(result.telegramUrl, "_blank", "noopener,noreferrer");
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      setError((error as Error).name === "AbortError" ? "The database took too long to respond. Check the Neon connection and try again." : "Could not reach the server. Please try again.");
+    } finally {
+      window.clearTimeout(timeout);
+      setLoading(false);
+    }
   }
 
   return <main className="login-shell">
