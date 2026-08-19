@@ -10,6 +10,12 @@
 .agenda-card-tools .agenda-delete:hover { background: #fee4e2; color: #b42318; }
 .agenda-item-wrap .agenda-item { padding-right: 78px; }
 .agenda-item:hover { background: var(--brand-soft); }
+.agenda-item.orange { border-color: #fdb022; border-left-color: #f79009; background: #fffaeb; }
+.agenda-item.orange:hover { background: #fef0c7; }
+.agenda-item.red { border-color: #f97066; border-left-color: #d92d20; background: #fff1f0; }
+.agenda-item.red:hover { background: #fee4e2; }
+.agenda-urgency { display: inline-block; margin-bottom: 6px; padding: 3px 6px; border-radius: 999px; font-size: 8px; font-weight: 850; color: #b54708; background: #fef0c7; }
+.agenda-item.red .agenda-urgency { color: #b42318; background: #fee4e2; }
 .agenda-item strong, .agenda-item span { display: block; }
 .agenda-time { color: var(--brand); font-size: 10px; font-weight: 850; margin-bottom: 5px; }
 .agenda-player { display: flex !important; align-items: center; gap: 4px; color: var(--brand); background: var(--brand-soft); border-radius: 6px; padding: 4px 5px; margin-bottom: 6px; font-size: 9px; font-weight: 800; }

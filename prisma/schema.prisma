@@ -7,12 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role { ADMIN WORKER }
-enum WorkStatus { UNASSIGNED ASSIGNED IN_PROGRESS READY_FOR_REVIEW COMPLETED CANCELLED }
-enum Priority { LOW MEDIUM HIGH URGENT }
-enum AgendaKind { FIXTURE MANUAL }
-enum NotificationChannel { IN_APP EMAIL TELEGRAM }
-enum DeliveryStatus { PENDING SENT FAILED SKIPPED }
+enum Role {
+  ADMIN
+  WORKER
+}
+enum WorkStatus {
+  UNASSIGNED
+  ASSIGNED
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  COMPLETED
+  CANCELLED
+}
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+enum AgendaKind {
+  FIXTURE
+  MANUAL
+}
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
 
 model User {
   id String @id @default(cuid())
@@ -30,6 +57,7 @@ model User {
   updatedAt DateTime @updatedAt
   favourites Favourite[]
   preferences NotificationPreference?
+  agendaItems AgendaItem[]
 }
 
 model Worker {
@@ -54,6 +82,7 @@ model Club {
   logoUrl String?
   homeFixtures Fixture[] @relation("HomeClub")
   awayFixtures Fixture[] @relation("AwayClub")
+  players Player[]
   @@unique([provider, externalId])
 }
 
@@ -106,6 +135,7 @@ model Fixture {
 model AgendaItem {
   id String @id @default(cuid())
   userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind AgendaKind
   title String
   startsAt DateTime
@@ -133,7 +163,7 @@ model Assignment {
   id String @id @default(cuid())
   agendaItemId String @unique
   workerId String
-  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id])
+  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
   worker Worker @relation(fields: [workerId], references: [id])
   assignedAt DateTime @default(now())
   @@index([workerId])
@@ -144,7 +174,7 @@ model AssignmentHistory {
   agendaItemId String
   workerId String?
   action String
-  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id])
+  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 
@@ -174,7 +204,7 @@ model NotificationPreference {
 model NotificationLog {
   id String @id @default(cuid())
   agendaItemId String
-  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id])
+  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
   recipient String
   channel NotificationChannel
   type String

@@ -10,7 +10,7 @@ A private football creative-operations dashboard built with Next.js, TypeScript,
 - Demo football provider for development without a paid API key
 - Duplicate-safe fixture import and manual agenda items
 - Match detail drawer with worker, status, priority and notes editing
-- Exact 48-hour and overdue presentation rules
+- Orange agenda cards inside 48 hours and red cards inside 24 hours
 - Normalized PostgreSQL/Prisma schema with assignment and notification history
 - Authenticated cron endpoints for fixture sync and notifications
 - Vercel cron configuration and environment template
@@ -28,7 +28,21 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The development sign-in number is `+994 50 123 45 67`. Set `ADMIN_PHONE` before deployment.
 
-For Telegram onboarding, create a bot with BotFather and configure `TELEGRAM_BOT_USERNAME`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_WEBHOOK_SECRET`. Registration produces a one-time `/start` deep link. Telegram requires the user to tap **Start** once; after that webhook confirmation, the chat ID can be associated with the registered account and reminders activate automatically.
+## Telegram reminders
+
+1. Open `@BotFather` in Telegram, run `/newbot`, and save the token and bot username.
+2. Add `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without `@`), `TELEGRAM_WEBHOOK_SECRET`, `DATABASE_URL`, and `CRON_SECRET` to Vercel for Production and Preview.
+3. Apply the database schema with `npm run db:push`, then redeploy.
+4. Register in Futonic again, open **Settings → Telegram activation**, open the generated link, and tap **Start** in Telegram.
+5. Register the production webhook (replace the placeholders):
+
+```bash
+curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://<YOUR_VERCEL_DOMAIN>/api/telegram/webhook","secret_token":"<TELEGRAM_WEBHOOK_SECRET>","allowed_updates":["message"]}'
+```
+
+The bot confirms a successful connection. The daily Vercel cron sends one duplicate-safe Telegram reminder when a match enters the 24–48-hour window. Agenda changes are synchronized to PostgreSQL after each edit, so reminders work even when the dashboard is closed.
 
 ## Database
 
@@ -39,7 +53,7 @@ npm run db:generate
 npm run db:push
 ```
 
-The current interface deliberately runs in demo mode without a database, making product review possible immediately. The Prisma schema is the production persistence contract; connect server actions to these models as the next deployment step.
+The interface can still be reviewed without a database, but Telegram activation, server-side agenda synchronization, and background reminders require PostgreSQL.
 
 ## Football providers
 
@@ -64,7 +78,7 @@ Search requests are debounced and cached for one hour to protect the free quota.
 4. Connect PostgreSQL and run the Prisma schema migration.
 5. Deploy. `vercel.json` uses two once-daily UTC schedules so the project can deploy on Vercel's entry plan: notification processing at 01:05 UTC and fixture sync at 01:20 UTC. Upgrade the Vercel plan before changing these back to hourly or six-hour schedules.
 
-Cron requests must include `Authorization: Bearer <CRON_SECRET>`. Both jobs are designed as idempotent boundaries; notification delivery should use `NotificationLog.idempotencyKey` before enabling external email or Telegram sends.
+Cron requests must include `Authorization: Bearer <CRON_SECRET>`. Vercel adds this header automatically to configured cron invocations. Telegram delivery records `NotificationLog.idempotencyKey`, preventing the same match reminder from being sent twice.
 
 ## Verification
 

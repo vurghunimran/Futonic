@@ -17,10 +17,13 @@ export function moveWeek(anchor: Date, direction: -1 | 1) {
 export function getTimingState(item: AgendaItem, now = new Date()) {
   if (item.status === "Completed" || item.status === "Cancelled") return { kind: "safe" as const, label: "" };
   const minutes = differenceInMinutes(new Date(item.startsAt), now);
-  if (minutes < 0) return { kind: "overdue" as const, label: "Overdue" };
+  if (minutes <= 0) return { kind: "red" as const, label: "Started" };
+  if (minutes <= 24 * 60) {
+    if (minutes < 60) return { kind: "red" as const, label: `${Math.max(1, minutes)}m remaining` };
+    return { kind: "red" as const, label: `${Math.ceil(minutes / 60)}h remaining` };
+  }
   if (minutes <= 48 * 60) {
-    if (minutes < 60) return { kind: "warning" as const, label: `${Math.max(1, minutes)}m remaining` };
-    return { kind: "warning" as const, label: `${Math.ceil(minutes / 60)}h remaining` };
+    return { kind: "orange" as const, label: `${Math.ceil(minutes / 60)}h remaining` };
   }
   return { kind: "safe" as const, label: "" };
 }
