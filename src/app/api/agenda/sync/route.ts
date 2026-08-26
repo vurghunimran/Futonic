@@ -20,8 +20,8 @@ export async function POST(request: Request) {
     prisma.agendaItem.deleteMany({ where: { userId, ...(ids.length ? { id: { notIn: ids } } : {}) } }),
     ...parsed.items.map((item) => prisma.agendaItem.upsert({
       where: { id: item.id },
-      create: { id: item.id, userId, kind: item.kind === "fixture" ? "FIXTURE" : "MANUAL", title: item.title, startsAt: new Date(item.startsAt), status: statuses[item.status], priority: priorities[item.priority], client: item.client, workType: item.kind === "fixture" || (item.home && item.away) ? "match" : "task", description: JSON.stringify({ competition: item.competition, home: item.home, away: item.away, selectedPlayer: item.selectedPlayer, venue: item.venue }) },
-      update: { title: item.title, startsAt: new Date(item.startsAt), status: statuses[item.status], priority: priorities[item.priority], client: item.client, workType: item.kind === "fixture" || (item.home && item.away) ? "match" : "task", description: JSON.stringify({ competition: item.competition, home: item.home, away: item.away, selectedPlayer: item.selectedPlayer, venue: item.venue }) },
+      create: { id: item.id, userId, kind: item.kind === "fixture" ? "FIXTURE" : "MANUAL", title: item.title, startsAt: new Date(item.startsAt), status: statuses[item.status], priority: priorities[item.priority], client: item.client, workType: item.kind === "fixture" || (item.home && item.away) ? "match" : "task", description: JSON.stringify({ competition: item.competition, home: item.home, away: item.away, selectedPlayer: item.selectedPlayer, venue: item.venue, contentType: item.contentType }) },
+      update: { title: item.title, startsAt: new Date(item.startsAt), status: statuses[item.status], priority: priorities[item.priority], client: item.client, workType: item.kind === "fixture" || (item.home && item.away) ? "match" : "task", description: JSON.stringify({ competition: item.competition, home: item.home, away: item.away, selectedPlayer: item.selectedPlayer, venue: item.venue, contentType: item.contentType }) },
     })),
   ]);
   const now = new Date();

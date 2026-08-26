@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { addDays, format, isSameDay, parseISO } from "date-fns";
 import {
   Bell, BriefcaseBusiness, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleUserRound,
-  Copy, LayoutDashboard, LogOut, Plus, Search, Settings, Trash2, UserRoundPlus, Users, X,
+  Copy, LayoutDashboard, LogOut, Plus, Search, Settings, Table2, Trash2, UserRoundPlus, Users, X,
 } from "lucide-react";
-import type { AgendaItem, FootballEntity } from "@/lib/types";
+import type { AgendaItem, ContentType, FootballEntity, WorkStatus } from "@/lib/types";
 import { getTimingState, getWeekDays, moveWeek, weekLabel } from "@/lib/time";
 
 type Page = "dashboard" | "clients" | "workers" | "settings";
@@ -120,7 +120,7 @@ export function Dashboard() {
       const response = await fetch(`/api/football/fixtures?${params}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Fixtures could not be loaded");
-      const incoming: WorkItem[] = (data.fixtures || []).map((fixture: AgendaItem) => ({ ...fixture, client: entity.name, workerId: "" }));
+      const incoming: WorkItem[] = (data.fixtures || []).map((fixture: AgendaItem) => ({ ...fixture, client: entity.name, workerId: "", contentType: fixture.contentType || "Design" }));
       setWork((current) => [...current, ...incoming.filter((fixture) => !current.some((saved) => saved.id === fixture.id))]);
       setToast(`${entity.name} added with ${incoming.length} upcoming match${incoming.length === 1 ? "" : "es"}`);
       setPage("dashboard");
@@ -156,7 +156,7 @@ export function Dashboard() {
         </div>
       </header>
       <div className="content">
-        {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} onMoveWork={(item, amount) => { setWork((current) => current.map((entry) => entry.id === item.id ? { ...entry, startsAt: addDays(parseISO(entry.startsAt), amount).toISOString() } : entry)); setToast(`${item.title} moved ${amount < 0 ? "one day earlier" : "one day later"}`); }} onDeleteWork={(item) => { setWork((current) => current.filter((entry) => entry.id !== item.id)); setToast(`${item.title} removed from agenda`); }} />}
+        {page === "dashboard" && <DashboardHome clients={clients} workers={workers} work={work} onSearch={() => selectPage("clients")} onAddWorker={() => setWorkerOpen(true)} onAddWork={() => setWorkOpen(true)} onOpenWork={setSelectedWork} onUpdateWork={(item) => setWork((current) => current.map((entry) => entry.id === item.id ? item : entry))} onMoveWork={(item, amount) => { setWork((current) => current.map((entry) => entry.id === item.id ? { ...entry, startsAt: addDays(parseISO(entry.startsAt), amount).toISOString() } : entry)); setToast(`${item.title} moved ${amount < 0 ? "one day earlier" : "one day later"}`); }} onDeleteWork={(item) => { setWork((current) => current.filter((entry) => entry.id !== item.id)); setToast(`${item.title} removed from agenda`); }} />}
         {page === "clients" && <ClientsPage clients={clients} query={query} setQuery={setQuery} mode={mode} setMode={setMode} results={results} searching={searching} error={searchError} provider={footballProvider} onAdd={addClient} onRemove={removeClient} />}
         {page === "workers" && <WorkersPage workers={workers} onAdd={() => setWorkerOpen(true)} onRemove={(id) => setWorkers((current) => current.filter((worker) => worker.id !== id))} />}
         {page === "settings" && <SettingsPage onSaved={showToast} />}
@@ -169,12 +169,50 @@ export function Dashboard() {
   </div>;
 }
 
-function DashboardHome({ clients, workers, work, onSearch, onAddWorker, onAddWork, onOpenWork, onMoveWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onSearch: () => void; onAddWorker: () => void; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onMoveWork: (item: WorkItem, amount: number) => void; onDeleteWork: (item: WorkItem) => void }) {
+function DashboardHome({ clients, workers, work, onSearch, onAddWorker, onAddWork, onOpenWork, onUpdateWork, onMoveWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onSearch: () => void; onAddWorker: () => void; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onUpdateWork: (item: WorkItem) => void; onMoveWork: (item: WorkItem, amount: number) => void; onDeleteWork: (item: WorkItem) => void }) {
   return <>
     <section className="overview"><div className="welcome"><div className="eyebrow">Futonic workspace</div><h2>Your creative roster, your way.</h2><p>Only clients, workers and work selected by you appear here.</p></div><Metric label="My clients" value={String(clients.length)} note="Players and clubs" /><Metric label="Workers" value={String(workers.length)} note="Available to assign" /><Metric label="Open work" value={String(work.filter((item) => item.status !== "Completed").length)} note="Needs attention" /></section>
     <section className="quick-actions"><button onClick={onSearch}><Search size={19} /><span><strong>Add a client</strong><small>Find a player or club</small></span></button><button onClick={onAddWorker}><UserRoundPlus size={19} /><span><strong>Create worker</strong><small>Build your assignment team</small></span></button><button onClick={onAddWork}><Plus size={19} /><span><strong>Create work</strong><small>Add a manual design task</small></span></button></section>
-    <AgendaCalendar work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} onMoveWork={onMoveWork} onDeleteWork={onDeleteWork} />
+    <AgendaWorkspace clients={clients} workers={workers} work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} onUpdateWork={onUpdateWork} onMoveWork={onMoveWork} onDeleteWork={onDeleteWork} />
   </>;
+}
+
+function AgendaWorkspace({ clients, workers, work, onAddWork, onOpenWork, onUpdateWork, onMoveWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onUpdateWork: (item: WorkItem) => void; onMoveWork: (item: WorkItem, amount: number) => void; onDeleteWork: (item: WorkItem) => void }) {
+  const [view, setView] = useState<"calendar" | "table">("calendar");
+  return <>
+    <div className="agenda-view-switch" role="group" aria-label="Agenda view">
+      <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")}><CalendarDays size={14} />Calendar</button>
+      <button className={view === "table" ? "active" : ""} onClick={() => setView("table")}><Table2 size={14} />Table</button>
+    </div>
+    {view === "calendar"
+      ? <AgendaCalendar work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} onMoveWork={onMoveWork} onDeleteWork={onDeleteWork} />
+      : <AgendaTable clients={clients} workers={workers} work={work} onAddWork={onAddWork} onOpenWork={onOpenWork} onUpdateWork={onUpdateWork} onDeleteWork={onDeleteWork} />}
+  </>;
+}
+
+const workStatuses: WorkStatus[] = ["Unassigned", "Assigned", "In Progress", "Ready for Review", "Completed", "Cancelled"];
+const contentTypes: ContentType[] = ["Design", "Video", "Photo", "AI-generated", "Other"];
+
+function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onUpdateWork: (item: WorkItem) => void; onDeleteWork: (item: WorkItem) => void }) {
+  const [anchor, setAnchor] = useState(new Date());
+  const days = getWeekDays(anchor);
+  const rows = work.filter((item) => days.some((day) => isSameDay(parseISO(item.startsAt), day))).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const players = clients.filter((client) => client.type === "player");
+  return <section className="panel agenda-table-card">
+    <div className="calendar-head"><div><div className="eyebrow">Table view</div><h2>Weekly work table</h2><p>{weekLabel(anchor)} · {rows.length} item{rows.length === 1 ? "" : "s"}</p></div><div className="agenda-actions"><button className="button" aria-label="Previous week" onClick={() => setAnchor(moveWeek(anchor, -1))}><ChevronLeft size={15} /></button><button className="button" onClick={() => setAnchor(new Date())}>Today</button><button className="button" aria-label="Next week" onClick={() => setAnchor(moveWeek(anchor, 1))}><ChevronRight size={15} /></button><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
+    <div className="agenda-table-scroll"><table className="agenda-table"><thead><tr><th>Player / client</th><th>Match or work</th><th>Date</th><th>Assignee</th><th>Status</th><th>Type</th><th aria-label="Actions" /></tr></thead><tbody>
+      {rows.map((item) => <tr key={item.id}>
+        <td><select aria-label={`Player for ${item.title}`} value={item.selectedPlayer || ""} onChange={(event) => onUpdateWork({ ...item, selectedPlayer: event.target.value || undefined })}><option value="">{item.client || "Select player"}</option>{item.selectedPlayer && !players.some((player) => player.name === item.selectedPlayer) && <option value={item.selectedPlayer}>{item.selectedPlayer}</option>}{players.map((player) => <option key={player.id} value={player.name}>{player.name}</option>)}</select></td>
+        <td><button className="table-title" onClick={() => onOpenWork(item)}><span className="table-ball">⚽</span><span><strong>{item.title}</strong><small>{item.competition || item.client}</small></span></button></td>
+        <td><input aria-label={`Date for ${item.title}`} type="datetime-local" value={format(parseISO(item.startsAt), "yyyy-MM-dd'T'HH:mm")} onChange={(event) => event.target.value && onUpdateWork({ ...item, startsAt: new Date(event.target.value).toISOString() })} /></td>
+        <td><select aria-label={`Assignee for ${item.title}`} value={item.workerId || ""} onChange={(event) => onUpdateWork({ ...item, workerId: event.target.value, status: event.target.value ? (item.status === "Unassigned" ? "Assigned" : item.status) : "Unassigned" })}><option value="">Unassigned</option>{workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name} {worker.surname}</option>)}</select></td>
+        <td><select className="table-status" aria-label={`Status for ${item.title}`} value={item.status} onChange={(event) => onUpdateWork({ ...item, status: event.target.value as WorkStatus })}>{workStatuses.map((status) => <option key={status}>{status}</option>)}</select></td>
+        <td><select className="table-type" aria-label={`Content type for ${item.title}`} value={item.contentType || "Design"} onChange={(event) => onUpdateWork({ ...item, contentType: event.target.value as ContentType })}>{contentTypes.map((type) => <option key={type}>{type}</option>)}</select></td>
+        <td><button className="icon-button subtle" aria-label={`Delete ${item.title}`} onClick={() => onDeleteWork(item)}><Trash2 size={14} /></button></td>
+      </tr>)}
+      {!rows.length && <tr><td colSpan={7}><div className="table-empty"><Table2 size={20} /><strong>No work this week</strong><span>Add a client or create work manually.</span><button className="button accent" onClick={onAddWork}><Plus size={14} />Add work</button></div></td></tr>}
+    </tbody></table></div>
+  </section>;
 }
 
 function AgendaCalendar({ work, onAddWork, onOpenWork, onMoveWork, onDeleteWork }: { work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onMoveWork: (item: WorkItem, amount: number) => void; onDeleteWork: (item: WorkItem) => void }) {
@@ -230,10 +268,11 @@ function WorkModal({ clients, workers, onClose, onAdd }: { clients: FootballEnti
   const [away, setAway] = useState("");
   const [player, setPlayer] = useState("");
   const [venue, setVenue] = useState("");
+  const [contentType, setContentType] = useState<ContentType>("Design");
   const valid = startsAt && (type === "task" ? title.trim() : home.trim() && away.trim() && competition.trim());
 
   function createItem() {
-    const common = { id: crypto.randomUUID(), kind: "manual" as const, client: client || "No client", workerId, startsAt: new Date(startsAt).toISOString(), status: workerId ? "Assigned" as const : "Unassigned" as const, priority: "Medium" as const };
+    const common = { id: crypto.randomUUID(), kind: "manual" as const, client: client || "No client", workerId, startsAt: new Date(startsAt).toISOString(), status: workerId ? "Assigned" as const : "Unassigned" as const, priority: "Medium" as const, contentType };
     if (type === "match") {
       onAdd({ ...common, title: `${home.trim()} vs ${away.trim()}`, home: home.trim(), away: away.trim(), homeCode: initials(home), awayCode: initials(away), competition: competition.trim(), venue: venue.trim() || undefined, selectedPlayer: player.trim() || undefined, fixtureStatus: "Manually added" });
       return;
@@ -251,6 +290,7 @@ function WorkModal({ clients, workers, onClose, onAdd }: { clients: FootballEnti
     </>}
     <Field label={type === "match" ? "Kickoff date and time" : "Agenda date and time"}><input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></Field>
     <Field label="Client"><select value={client} onChange={(event) => setClient(event.target.value)}><option value="">No client</option>{clients.map((entry) => <option key={entry.id}>{entry.name}</option>)}</select></Field>
+    <Field label="Content type"><select value={contentType} onChange={(event) => setContentType(event.target.value as ContentType)}>{contentTypes.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
     <Field label="Assign worker"><select value={workerId} onChange={(event) => setWorkerId(event.target.value)}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field>
     <div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!valid} onClick={createItem}>Add to agenda</button></div>
   </Modal>;
@@ -271,6 +311,7 @@ function AssignmentDrawer({ item, workers, onClose, onSave }: { item: WorkItem; 
     <div className="assignment-summary"><BriefcaseBusiness size={19} /><span>Edit details or assign this work to a worker created in the Workers panel.</span></div>
     <Field label="Assign worker"><select value={draft.workerId} onChange={(event) => setDraft({ ...draft, workerId: event.target.value, status: event.target.value ? "Assigned" : "Unassigned" })}><option value="">Unassigned</option>{workers.map((worker) => <option value={worker.id} key={worker.id}>{worker.name} {worker.surname} · {worker.role}</option>)}</select></Field>
     <Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as WorkItem["status"] })}><option>Unassigned</option><option>Assigned</option><option>In Progress</option><option>Ready for Review</option><option>Completed</option><option>Cancelled</option></select></Field>
+    <Field label="Content type"><select value={draft.contentType || "Design"} onChange={(event) => setDraft({ ...draft, contentType: event.target.value as ContentType })}>{contentTypes.map((entry) => <option key={entry}>{entry}</option>)}</select></Field>
     {!workers.length && <p className="inline-warning">Create a worker first; the assignment list is currently empty.</p>}
     <div className="drawer-actions"><button className="button" onClick={onClose}>Cancel</button><button className="button accent" disabled={!draft.title.trim()} onClick={() => onSave({ ...draft, title: draft.title.trim() })}>Save changes</button></div>
   </Modal>;

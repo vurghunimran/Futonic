@@ -15,6 +15,7 @@ export const agendaSyncItemSchema = z.object({
   away: optionalText(160),
   selectedPlayer: optionalText(160),
   venue: optionalText(240),
+  contentType: z.enum(["Design", "Video", "Photo", "AI-generated", "Other"]).catch("Design"),
 });
 
 export function parseAgendaSyncItems(body: unknown) {

@@ -1,5 +1,6 @@
 export type WorkStatus = "Unassigned" | "Assigned" | "In Progress" | "Ready for Review" | "Completed" | "Cancelled";
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
+export type ContentType = "Design" | "Video" | "Photo" | "AI-generated" | "Other";
 
 export type AgendaItem = {
   id: string;
@@ -25,6 +26,7 @@ export type AgendaItem = {
   worker?: string;
   notes?: string;
   notified?: boolean;
+  contentType?: ContentType;
 };
 
 export type FootballEntity = {

@@ -2,12 +2,20 @@ import type { AgendaItem, FootballEntity } from "@/lib/types";
 
 type SportsDbTeam = {
   idTeam: string;
+  idLeague?: string | null;
+  idLeague2?: string | null;
+  idLeague3?: string | null;
+  idLeague4?: string | null;
+  idLeague5?: string | null;
+  idLeague6?: string | null;
+  idLeague7?: string | null;
   strTeam: string;
   strTeamShort?: string | null;
   strCountry?: string | null;
   strLeague?: string | null;
   strBadge?: string | null;
   strTeamBadge?: string | null;
+  strCurrentSeason?: string | null;
 };
 
 type SportsDbPlayer = {
@@ -22,6 +30,8 @@ type SportsDbPlayer = {
 
 type SportsDbEvent = {
   idEvent: string;
+  idHomeTeam?: string | null;
+  idAwayTeam?: string | null;
   strTimestamp?: string | null;
   dateEvent?: string | null;
   strTime?: string | null;
@@ -102,8 +112,24 @@ function eventStart(event: SportsDbEvent) {
 }
 
 export async function getTheSportsDbFixtures(teamId: string, selectedPlayer?: string): Promise<AgendaItem[]> {
-  const data = await request<{ events: SportsDbEvent[] | null }>("eventsnext.php", { id: teamId });
-  return (data.events || []).map((event) => {
+  const teamData = await request<{ teams: SportsDbTeam[] | null }>("lookupteam.php", { id: teamId }).catch(() => ({ teams: null }));
+  const team = teamData.teams?.[0];
+  const upcomingRequest = request<{ events: SportsDbEvent[] | null }>("eventsnext.php", { id: teamId });
+  const leagueIds = team ? [team.idLeague, team.idLeague2, team.idLeague3, team.idLeague4, team.idLeague5, team.idLeague6, team.idLeague7].filter((id): id is string => Boolean(id)) : [];
+  const seasonRequests = team?.strCurrentSeason
+    ? leagueIds.map((id) => request<{ events: SportsDbEvent[] | null }>("eventsseason.php", { id, s: team.strCurrentSeason! }).catch(() => ({ events: null })))
+    : [];
+  const [upcomingData, ...seasonData] = await Promise.all([upcomingRequest, ...seasonRequests]);
+  const teamName = team?.strTeam?.toLowerCase();
+  const seasonEvents = seasonData.flatMap((data) => data.events || []).filter((event) =>
+    event.idHomeTeam === teamId || event.idAwayTeam === teamId ||
+    (teamName && (event.strHomeTeam?.toLowerCase() === teamName || event.strAwayTeam?.toLowerCase() === teamName))
+  );
+  const events = [...(upcomingData.events || []), ...seasonEvents]
+    .filter((event, index, all) => all.findIndex((candidate) => candidate.idEvent === event.idEvent) === index)
+    .filter((event) => new Date(eventStart(event)).getTime() >= Date.now())
+    .sort((a, b) => eventStart(a).localeCompare(eventStart(b)));
+  return events.map((event) => {
     const home = event.strHomeTeam || "Home team";
     const away = event.strAwayTeam || "Away team";
     return {
