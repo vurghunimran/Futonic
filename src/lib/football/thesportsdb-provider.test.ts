@@ -31,14 +31,18 @@ describe("TheSportsDB provider", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ events: [
         { idEvent: "2494000", strTimestamp: "2099-08-21T19:00:00", idHomeTeam: "133604", strHomeTeam: "Arsenal", strAwayTeam: "Coventry City" },
         { idEvent: "2494001", strTimestamp: "2099-08-24T19:00:00", idAwayTeam: "133604", strHomeTeam: "Liverpool", strAwayTeam: "Arsenal" },
+      ] })))
+      .mockResolvedValue(new Response(JSON.stringify({ events: [
+        { idEvent: "2494002", strTimestamp: "2099-08-31T19:00:00", idHomeTeam: "133604", strHomeTeam: "Arsenal", strAwayTeam: "Chelsea" },
       ] })));
     vi.stubGlobal("fetch", fetchMock);
 
     const fixtures = await getTheSportsDbFixtures("133604", "Test Player");
 
-    expect(fixtures).toHaveLength(2);
+    expect(fixtures).toHaveLength(3);
     expect(String(fetchMock.mock.calls[2][0])).toContain("eventsseason.php?id=4328&s=2099-2100");
     expect(fixtures[0]).toMatchObject({ externalFixtureId: "2494000", selectedPlayer: "Test Player", startsAt: "2099-08-21T19:00:00Z", round: "Round 1" });
     expect(fixtures[1]).toMatchObject({ externalFixtureId: "2494001", title: "Liverpool vs Arsenal" });
+    expect(fixtures[2]).toMatchObject({ externalFixtureId: "2494002", title: "Arsenal vs Chelsea" });
   });
 });

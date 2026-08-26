@@ -126,7 +126,26 @@ export async function getTheSportsDbFixtures(teamId: string, selectedPlayer?: st
     event.idHomeTeam === teamId || event.idAwayTeam === teamId ||
     (teamName && (event.strHomeTeam?.toLowerCase() === teamName || event.strAwayTeam?.toLowerCase() === teamName))
   );
-  const events = [...(upcomingData.events || []), ...seasonEvents]
+  const knownEvents = [...(upcomingData.events || []), ...seasonEvents];
+  const knownFutureCount = new Set(knownEvents
+    .filter((event) => new Date(eventStart(event)).getTime() >= Date.now())
+    .map((event) => event.idEvent)).size;
+  const primaryLeagueId = leagueIds[0];
+  const dailyData = knownFutureCount >= 3 || !primaryLeagueId ? [] : await Promise.all(
+    Array.from({ length: 24 }, (_, offset) => {
+      const date = new Date();
+      date.setUTCDate(date.getUTCDate() + offset);
+      return request<{ events: SportsDbEvent[] | null }>("eventsday.php", {
+        d: date.toISOString().slice(0, 10),
+        l: primaryLeagueId,
+      }).catch(() => ({ events: null }));
+    }),
+  );
+  const dailyEvents = dailyData.flatMap((data) => data.events || []).filter((event) =>
+    event.idHomeTeam === teamId || event.idAwayTeam === teamId ||
+    (teamName && (event.strHomeTeam?.toLowerCase() === teamName || event.strAwayTeam?.toLowerCase() === teamName))
+  );
+  const events = [...knownEvents, ...dailyEvents]
     .filter((event, index, all) => all.findIndex((candidate) => candidate.idEvent === event.idEvent) === index)
     .filter((event) => new Date(eventStart(event)).getTime() >= Date.now())
     .sort((a, b) => eventStart(a).localeCompare(eventStart(b)));

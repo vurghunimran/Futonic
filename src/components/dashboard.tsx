@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, format, isSameDay, parseISO } from "date-fns";
 import {
@@ -198,7 +198,9 @@ function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWo
   return <section className="panel agenda-table-card">
     <div className="calendar-head"><div><div className="eyebrow">Table view</div><h2>Upcoming work table</h2><p>{rows.length} item{rows.length === 1 ? "" : "s"} across all planned weeks</p></div><div className="agenda-actions"><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
     <div className="agenda-table-scroll"><table className="agenda-table"><thead><tr><th>Player / client</th><th>Match or work</th><th>Date</th><th>Assignee</th><th>Status</th><th>Type</th><th aria-label="Actions" /></tr></thead><tbody>
-      {rows.map((item) => <tr key={item.id}>
+      {rows.map((item, index) => { const month = format(parseISO(item.startsAt), "MMMM yyyy"); const previousMonth = index ? format(parseISO(rows[index - 1].startsAt), "MMMM yyyy") : ""; return <Fragment key={item.id}>
+        {month !== previousMonth && <tr className="agenda-month-row"><td colSpan={7}>{month}</td></tr>}
+        <tr>
         <td><input list="agenda-client-options" aria-label={`Client for ${item.title}`} value={item.client || ""} placeholder="Enter client name" onChange={(event) => onUpdateWork({ ...item, client: event.target.value })} /></td>
         <td><button className="table-title" onClick={() => onOpenWork(item)}><span className="table-ball">⚽</span><span><strong>{item.title}</strong><small>{item.competition || item.client}</small></span></button></td>
         <td><input aria-label={`Date for ${item.title}`} type="datetime-local" value={format(parseISO(item.startsAt), "yyyy-MM-dd'T'HH:mm")} onChange={(event) => event.target.value && onUpdateWork({ ...item, startsAt: new Date(event.target.value).toISOString() })} /></td>
@@ -206,7 +208,8 @@ function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWo
         <td><select className="table-status" aria-label={`Status for ${item.title}`} value={item.status} onChange={(event) => onUpdateWork({ ...item, status: event.target.value as WorkStatus })}>{workStatuses.map((status) => <option key={status}>{status}</option>)}</select></td>
         <td><select className="table-type" aria-label={`Content type for ${item.title}`} value={item.contentType || "Design"} onChange={(event) => onUpdateWork({ ...item, contentType: event.target.value as ContentType })}>{contentTypes.map((type) => <option key={type}>{type}</option>)}</select></td>
         <td><button className="icon-button subtle" aria-label={`Delete ${item.title}`} onClick={() => onDeleteWork(item)}><Trash2 size={14} /></button></td>
-      </tr>)}
+        </tr>
+      </Fragment>; })}
       {!rows.length && <tr><td colSpan={7}><div className="table-empty"><Table2 size={20} /><strong>No planned work</strong><span>Add a client or create work manually.</span><button className="button accent" onClick={onAddWork}><Plus size={14} />Add work</button></div></td></tr>}
     </tbody></table><datalist id="agenda-client-options">{clients.map((client) => <option key={client.id} value={client.name} />)}</datalist></div>
   </section>;

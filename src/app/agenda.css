@@ -51,6 +51,8 @@
 .agenda-table td { padding: 9px 10px; border-bottom: 1px solid #eceef1; vertical-align: middle; }
 .agenda-table tr:last-child td { border-bottom: 0; }
 .agenda-table tbody tr:hover { background: #fbfaff; }
+.agenda-table .agenda-month-row:hover { background: transparent; }
+.agenda-table .agenda-month-row td { padding: 15px 12px 8px; border-bottom: 3px solid #2112c9; color: #2112c9; font-size: 15px; font-weight: 900; letter-spacing: -.02em; }
 .agenda-table select, .agenda-table input { width: 100%; min-height: 34px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #344054; padding: 6px 8px; font-size: 10px; }
 .agenda-table select:hover, .agenda-table select:focus, .agenda-table input:hover, .agenda-table input:focus { border-color: #d8d2f6; background: #fff; outline: none; }
 .table-title { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; text-align: left; color: #182230; }
