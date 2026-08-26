@@ -194,18 +194,12 @@ const workStatuses: WorkStatus[] = ["Unassigned", "Assigned", "In Progress", "Re
 const contentTypes: ContentType[] = ["Design", "Video", "Photo", "AI-generated", "Other"];
 
 function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onUpdateWork: (item: WorkItem) => void; onDeleteWork: (item: WorkItem) => void }) {
-  const [anchor, setAnchor] = useState(new Date());
-  const days = getWeekDays(anchor);
-  const rows = work.filter((item) => {
-    const startsAt = agendaDate(item.startsAt);
-    return Boolean(startsAt && days.some((day) => isSameDay(startsAt, day)));
-  }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const players = clients.filter((client) => client.type === "player");
+  const rows = work.filter((item) => Boolean(agendaDate(item.startsAt))).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   return <section className="panel agenda-table-card">
-    <div className="calendar-head"><div><div className="eyebrow">Table view</div><h2>Weekly work table</h2><p>{weekLabel(anchor)} · {rows.length} item{rows.length === 1 ? "" : "s"}</p></div><div className="agenda-actions"><button className="button" aria-label="Previous week" onClick={() => setAnchor(moveWeek(anchor, -1))}><ChevronLeft size={15} /></button><button className="button" onClick={() => setAnchor(new Date())}>Today</button><button className="button" aria-label="Next week" onClick={() => setAnchor(moveWeek(anchor, 1))}><ChevronRight size={15} /></button><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
+    <div className="calendar-head"><div><div className="eyebrow">Table view</div><h2>Upcoming work table</h2><p>{rows.length} item{rows.length === 1 ? "" : "s"} across all planned weeks</p></div><div className="agenda-actions"><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>
     <div className="agenda-table-scroll"><table className="agenda-table"><thead><tr><th>Player / client</th><th>Match or work</th><th>Date</th><th>Assignee</th><th>Status</th><th>Type</th><th aria-label="Actions" /></tr></thead><tbody>
       {rows.map((item) => <tr key={item.id}>
-        <td><select aria-label={`Player for ${item.title}`} value={item.selectedPlayer || ""} onChange={(event) => onUpdateWork({ ...item, selectedPlayer: event.target.value || undefined })}><option value="">{item.client || "Select player"}</option>{item.selectedPlayer && !players.some((player) => player.name === item.selectedPlayer) && <option value={item.selectedPlayer}>{item.selectedPlayer}</option>}{players.map((player) => <option key={player.id} value={player.name}>{player.name}</option>)}</select></td>
+        <td><input list="agenda-client-options" aria-label={`Client for ${item.title}`} value={item.client || ""} placeholder="Enter client name" onChange={(event) => onUpdateWork({ ...item, client: event.target.value })} /></td>
         <td><button className="table-title" onClick={() => onOpenWork(item)}><span className="table-ball">⚽</span><span><strong>{item.title}</strong><small>{item.competition || item.client}</small></span></button></td>
         <td><input aria-label={`Date for ${item.title}`} type="datetime-local" value={format(parseISO(item.startsAt), "yyyy-MM-dd'T'HH:mm")} onChange={(event) => event.target.value && onUpdateWork({ ...item, startsAt: new Date(event.target.value).toISOString() })} /></td>
         <td><select aria-label={`Assignee for ${item.title}`} value={item.workerId || ""} onChange={(event) => onUpdateWork({ ...item, workerId: event.target.value, status: event.target.value ? (item.status === "Unassigned" ? "Assigned" : item.status) : "Unassigned" })}><option value="">Unassigned</option>{workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name} {worker.surname}</option>)}</select></td>
@@ -213,8 +207,8 @@ function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWo
         <td><select className="table-type" aria-label={`Content type for ${item.title}`} value={item.contentType || "Design"} onChange={(event) => onUpdateWork({ ...item, contentType: event.target.value as ContentType })}>{contentTypes.map((type) => <option key={type}>{type}</option>)}</select></td>
         <td><button className="icon-button subtle" aria-label={`Delete ${item.title}`} onClick={() => onDeleteWork(item)}><Trash2 size={14} /></button></td>
       </tr>)}
-      {!rows.length && <tr><td colSpan={7}><div className="table-empty"><Table2 size={20} /><strong>No work this week</strong><span>Add a client or create work manually.</span><button className="button accent" onClick={onAddWork}><Plus size={14} />Add work</button></div></td></tr>}
-    </tbody></table></div>
+      {!rows.length && <tr><td colSpan={7}><div className="table-empty"><Table2 size={20} /><strong>No planned work</strong><span>Add a client or create work manually.</span><button className="button accent" onClick={onAddWork}><Plus size={14} />Add work</button></div></td></tr>}
+    </tbody></table><datalist id="agenda-client-options">{clients.map((client) => <option key={client.id} value={client.name} />)}</datalist></div>
   </section>;
 }
 
