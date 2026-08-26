@@ -36,6 +36,7 @@ type SportsDbEvent = {
   dateEvent?: string | null;
   strTime?: string | null;
   strEvent?: string | null;
+  strSeason?: string | null;
   strHomeTeam?: string | null;
   strAwayTeam?: string | null;
   strHomeTeamBadge?: string | null;
@@ -114,12 +115,12 @@ function eventStart(event: SportsDbEvent) {
 export async function getTheSportsDbFixtures(teamId: string, selectedPlayer?: string): Promise<AgendaItem[]> {
   const teamData = await request<{ teams: SportsDbTeam[] | null }>("lookupteam.php", { id: teamId }).catch(() => ({ teams: null }));
   const team = teamData.teams?.[0];
-  const upcomingRequest = request<{ events: SportsDbEvent[] | null }>("eventsnext.php", { id: teamId });
+  const upcomingData = await request<{ events: SportsDbEvent[] | null }>("eventsnext.php", { id: teamId });
   const leagueIds = team ? [team.idLeague, team.idLeague2, team.idLeague3, team.idLeague4, team.idLeague5, team.idLeague6, team.idLeague7].filter((id): id is string => Boolean(id)) : [];
-  const seasonRequests = team?.strCurrentSeason
-    ? leagueIds.map((id) => request<{ events: SportsDbEvent[] | null }>("eventsseason.php", { id, s: team.strCurrentSeason! }).catch(() => ({ events: null })))
-    : [];
-  const [upcomingData, ...seasonData] = await Promise.all([upcomingRequest, ...seasonRequests]);
+  const now = new Date();
+  const fallbackSeason = now.getUTCMonth() >= 6 ? `${now.getUTCFullYear()}-${now.getUTCFullYear() + 1}` : `${now.getUTCFullYear() - 1}-${now.getUTCFullYear()}`;
+  const currentSeason = upcomingData.events?.find((event) => event.strSeason)?.strSeason || team?.strCurrentSeason || fallbackSeason;
+  const seasonData = await Promise.all(leagueIds.map((id) => request<{ events: SportsDbEvent[] | null }>("eventsseason.php", { id, s: currentSeason }).catch(() => ({ events: null }))));
   const teamName = team?.strTeam?.toLowerCase();
   const seasonEvents = seasonData.flatMap((data) => data.events || []).filter((event) =>
     event.idHomeTeam === teamId || event.idAwayTeam === teamId ||

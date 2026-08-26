@@ -8,7 +8,7 @@ import {
   Copy, LayoutDashboard, LogOut, Plus, Search, Settings, Table2, Trash2, UserRoundPlus, Users, X,
 } from "lucide-react";
 import type { AgendaItem, ContentType, FootballEntity, WorkStatus } from "@/lib/types";
-import { getTimingState, getWeekDays, moveWeek, weekLabel } from "@/lib/time";
+import { agendaDate, getTimingState, getWeekDays, moveWeek, weekLabel } from "@/lib/time";
 
 type Page = "dashboard" | "clients" | "workers" | "settings";
 type Worker = { id: string; name: string; surname: string; role: string };
@@ -196,7 +196,10 @@ const contentTypes: ContentType[] = ["Design", "Video", "Photo", "AI-generated",
 function AgendaTable({ clients, workers, work, onAddWork, onOpenWork, onUpdateWork, onDeleteWork }: { clients: FootballEntity[]; workers: Worker[]; work: WorkItem[]; onAddWork: () => void; onOpenWork: (item: WorkItem) => void; onUpdateWork: (item: WorkItem) => void; onDeleteWork: (item: WorkItem) => void }) {
   const [anchor, setAnchor] = useState(new Date());
   const days = getWeekDays(anchor);
-  const rows = work.filter((item) => days.some((day) => isSameDay(parseISO(item.startsAt), day))).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const rows = work.filter((item) => {
+    const startsAt = agendaDate(item.startsAt);
+    return Boolean(startsAt && days.some((day) => isSameDay(startsAt, day)));
+  }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const players = clients.filter((client) => client.type === "player");
   return <section className="panel agenda-table-card">
     <div className="calendar-head"><div><div className="eyebrow">Table view</div><h2>Weekly work table</h2><p>{weekLabel(anchor)} · {rows.length} item{rows.length === 1 ? "" : "s"}</p></div><div className="agenda-actions"><button className="button" aria-label="Previous week" onClick={() => setAnchor(moveWeek(anchor, -1))}><ChevronLeft size={15} /></button><button className="button" onClick={() => setAnchor(new Date())}>Today</button><button className="button" aria-label="Next week" onClick={() => setAnchor(moveWeek(anchor, 1))}><ChevronRight size={15} /></button><button className="button accent" onClick={onAddWork}><Plus size={15} />Add work</button></div></div>

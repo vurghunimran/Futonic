@@ -3,6 +3,12 @@ import type { AgendaItem } from "./types";
 
 export const DEFAULT_TIMEZONE = "Asia/Baku";
 
+export function agendaDate(value: unknown) {
+  if (typeof value !== "string" || !value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function weekBounds(anchor: Date) {
   return {
     start: startOfWeek(anchor, { weekStartsOn: 1 }),

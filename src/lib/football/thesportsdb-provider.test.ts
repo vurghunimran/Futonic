@@ -26,8 +26,8 @@ describe("TheSportsDB provider", () => {
 
   it("maps upcoming events into agenda fixtures", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ teams: [{ idTeam: "133604", idLeague: "4328", strTeam: "Arsenal", strCurrentSeason: "2099-2100" }] })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ events: [{ idEvent: "2494000", strTimestamp: "2099-08-21T19:00:00", strEvent: "Arsenal vs Coventry City", idHomeTeam: "133604", strHomeTeam: "Arsenal", strAwayTeam: "Coventry City", strLeague: "English Premier League", strVenue: "Emirates Stadium", intRound: "1", strStatus: "NS" }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ teams: [{ idTeam: "133604", idLeague: "4328", strTeam: "Arsenal" }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ events: [{ idEvent: "2494000", strSeason: "2099-2100", strTimestamp: "2099-08-21T19:00:00", strEvent: "Arsenal vs Coventry City", idHomeTeam: "133604", strHomeTeam: "Arsenal", strAwayTeam: "Coventry City", strLeague: "English Premier League", strVenue: "Emirates Stadium", intRound: "1", strStatus: "NS" }] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ events: [
         { idEvent: "2494000", strTimestamp: "2099-08-21T19:00:00", idHomeTeam: "133604", strHomeTeam: "Arsenal", strAwayTeam: "Coventry City" },
         { idEvent: "2494001", strTimestamp: "2099-08-24T19:00:00", idAwayTeam: "133604", strHomeTeam: "Liverpool", strAwayTeam: "Arsenal" },
@@ -37,6 +37,7 @@ describe("TheSportsDB provider", () => {
     const fixtures = await getTheSportsDbFixtures("133604", "Test Player");
 
     expect(fixtures).toHaveLength(2);
+    expect(String(fetchMock.mock.calls[2][0])).toContain("eventsseason.php?id=4328&s=2099-2100");
     expect(fixtures[0]).toMatchObject({ externalFixtureId: "2494000", selectedPlayer: "Test Player", startsAt: "2099-08-21T19:00:00Z", round: "Round 1" });
     expect(fixtures[1]).toMatchObject({ externalFixtureId: "2494001", title: "Liverpool vs Arsenal" });
   });
