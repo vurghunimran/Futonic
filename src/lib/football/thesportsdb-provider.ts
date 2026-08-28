@@ -132,7 +132,7 @@ export async function getTheSportsDbFixtures(teamId: string, selectedPlayer?: st
     .map((event) => event.idEvent)).size;
   const primaryLeagueId = leagueIds[0];
   const dailyData = knownFutureCount >= 3 || !primaryLeagueId ? [] : await Promise.all(
-    Array.from({ length: 24 }, (_, offset) => {
+    Array.from({ length: 10 }, (_, offset) => {
       const date = new Date();
       date.setUTCDate(date.getUTCDate() + offset);
       return request<{ events: SportsDbEvent[] | null }>("eventsday.php", {

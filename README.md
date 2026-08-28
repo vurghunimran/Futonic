@@ -68,7 +68,7 @@ FOOTBALL_API_BASE_URL="https://v3.football.api-sports.io"
 FOOTBALL_API_SEASON="2026"
 ```
 
-Search requests are debounced and cached for one hour to protect the free quota. Selecting a club imports its next 20 fixtures. Selecting a player resolves the player's current club from season statistics, imports that club's next 20 fixtures, labels each agenda item with the selected player, and adds the player to My Clients.
+Search requests are debounced and cached for one hour to protect the free quota. Selecting a club imports every available fixture in the next 10 days. Selecting a player resolves the player's current club, imports that club's available fixtures for the same 10-day window, labels each agenda item with the selected player, and adds the player to My Clients.
 
 ## Deployment
 
